@@ -32,17 +32,42 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// 返回 JSON
-	_ = json.NewEncoder(w).Encode(resp)
 	// 等价于 data = json.Marshal(resp)   w.Write(data)
+	_ = json.NewEncoder(w).Encode(resp)
+}
 
+// 封装中间件
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Headers: %+v\n", r.Header)
+		log.Printf("User-Agent: %s\n", r.UserAgent())
+		log.Printf("Content-Length: %d\n", r.ContentLength)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// 封装中间件
+func loggingMiddleware2(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		log.Printf("Content-Length:----- %d\n", r.ContentLength)
+		next.ServeHTTP(w, r)
+	}
 }
 
 func main() {
 	// 1️⃣ 创建路由器
 	mux := http.NewServeMux()
 
+	hello := http.HandlerFunc(helloHandler)
+
+	wrapperHello := loggingMiddleware(hello)
+	wrapperHello3 := loggingMiddleware2(hello)
+
 	// 2️⃣ 注册路由
 	mux.HandleFunc("/hello", helloHandler)
+	mux.Handle("/hello2", wrapperHello)
+	mux.HandleFunc("/hello3", wrapperHello3)
 
 	// 3️⃣ 启动 HTTP 服务
 	addr := ":3000"
